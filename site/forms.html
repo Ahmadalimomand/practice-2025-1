@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Проверка автомобиля</title>
+    <link rel="stylesheet" href="styles/globals.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Подтверждения записа</h1>
+
+      <!-- Форма ввода -->
+      <form id="checkForm">
+        <input type="text" id="name" placeholder="Ваше имя" required />
+        <input
+          type="text"
+          id="plate"
+          placeholder="Госномер (например, А123ВС77)"
+          required
+        />
+        <button type="submit">Подать запрос</button>
+      </form>
+
+      <!-- Результаты -->
+      <div id="info-section" class="hidden">
+        <p>Идет загрузка данных...</p>
+      </div>
+    </div>
+
+    <script>
+      const token = "sXraEuws8nCm1IyMUo2Zf6yas1y5COi2Zz2uxcAU183ca16b";
+
+      document
+        .getElementById("checkForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const name = document.getElementById("name").value.trim();
+          const plate = document
+            .getElementById("plate")
+            .value.trim()
+            .toUpperCase();
+
+          if (!name || !plate) {
+            alert("Пожалуйста, заполните все поля.");
+            return;
+          }
+
+          document.getElementById("info-section").classList.remove("hidden");
+          document.getElementById("info-section").innerHTML =
+            "<p>Идет загрузка данных...</p>";
+
+          fetchData(name, plate);
+        });
+
+      async function fetchSection(params) {
+        const response = await fetch("https://apipoint.ru/api/call", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(params),
+        });
+        const data = await response.json();
+        return data.result || null;
+      }
+
+      async function fetchData(name, gosnumber) {
+        try {
+          const gosnumData = await fetchSection({
+            sources: "number2vin,pic",
+            gosnomer: gosnumber,
+          });
+          
+          const vin = gosnumData[0]?.number2vin?.result?.vin;
+          const photos = gosnumData[0]?.pic?.imageList || [];
+
+          let dtpInfo = null;
+          let vinInfo = null;
+          if (vin != "") {
+            const vinData = await fetchSection({
+              sources: "gibdd,dtp",
+              vin: vin,
+            });
+
+            dtpInfo = vinData[0]?.dtp
+              ? JSON.stringify(vinData[0]?.dtp, null, 2)
+              : false;
+
+            vinInfo = vinData[0]?.gibdd
+              ? JSON.stringify(vinData[0]?.gibdd, null, 2)
+              : false;
+          }
+
+
+
+          document.getElementById("info-section").innerHTML = `
+                    <h2>Имя клиента: ${name}</h2>
+                    <h3>Госномер: ${gosnumber}</h3>
+
+                    <h3>Расшифровка VIN:</h3>
+                    <pre>${vinInfo ?? "нет данных"}</pre>
+
+                    <h3>Информация о ДТП:</h3>
+                    <pre>${dtpInfo ?? "нет данных"}</pre>
+
+                    <h3>Фотографии автомобиля:</h3>
+                    <div class="photos">
+                        ${
+                          photos.length
+                            ? photos
+                                .map(
+                                  (url) => `<img src="${url}" alt="Фото авто">`
+                                )
+                                .join("")
+                            : "<p>Нет фотографий</p>"
+                        }
+                    </div>
+                `;
+        } catch (error) {
+          console.error("Ошибка при загрузке данных:", error);
+          document.getElementById(
+            "info-section"
+          ).innerHTML = `<p style="color:red;">Ошибка при загрузке данных. Попробуйте позже.</p>`;
+        }
+      }
+    </script>
+  </body>
+</html>
